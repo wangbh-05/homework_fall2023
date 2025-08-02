@@ -51,6 +51,44 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
     # Replay buffer
     replay_buffer = ReplayBuffer(capacity=config["total_steps"])
 
+    # TODO load offline replaybuffer
+    # DONE
+    with open(os.path.join(args.dataset_dir, f"{config['dataset_name']}.pkl"), "rb") as f:
+        dataset = pickle.load(f)
+
+    # load dataset into replay buffer
+    if hasattr(dataset, 'observations') and dataset.size > 0:
+        
+        if replay_buffer.max_size < dataset.size:
+            replay_buffer = ReplayBuffer(capacity=max(config["total_steps"], dataset.size))
+
+        # initialize replay buffer with dataset
+        sample_obs = dataset.observations[0]
+        sample_action = dataset.actions[0]
+        sample_reward = dataset.rewards[0]
+        sample_next_obs = dataset.next_observations[0]
+        sample_done = dataset.dones[0]
+        
+        replay_buffer.insert(
+            observation=sample_obs,
+            action=sample_action,
+            reward=sample_reward,
+            next_observation=sample_next_obs,
+            done=sample_done
+        )
+
+        # Copy the entire dataset into the replay buffer
+        data_size = dataset.size
+        replay_buffer.observations[:data_size] = dataset.observations[:data_size]
+        replay_buffer.actions[:data_size] = dataset.actions[:data_size]
+        replay_buffer.rewards[:data_size] = dataset.rewards[:data_size]
+        replay_buffer.next_observations[:data_size] = dataset.next_observations[:data_size]
+        replay_buffer.dones[:data_size] = dataset.dones[:data_size]
+        replay_buffer.size = data_size
+        
+    else:
+        raise NotImplementedError("Offline dataset is empty")
+
     observation = env.reset()
 
     recent_observations = []
@@ -60,7 +98,40 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
 
     for step in tqdm.trange(config["total_steps"], dynamic_ncols=True):
         # TODO(student): Borrow code from another online training script here. Only run the online training loop after `num_offline_steps` steps.
+        # DONE
+        epsilon=None
+        # offline training:
+        if step<num_offline_steps:
+            pass
+        # online training:
+        else:
+            online_step=step-num_offline_steps
+            # epsilon = max(0.02, 0.1 - (0.1 - 0.02) * online_step / num_online_steps)
+            epsilon=exploration_schedule.value(online_step)
+            with torch.no_grad():
+                action = agent.get_action(observation, epsilon)
+            next_observation, reward, done, info = env.step(action)
+            next_observation = np.asarray(next_observation)
+            truncated = info.get("TimeLimit.truncated", False)
 
+            replay_buffer.insert(
+                observation,
+                action,
+                reward,
+                next_observation,
+                done=done and not truncated
+            )
+
+            # used to visualize the agent's behavior (after the offline training)
+            recent_observations.append(observation.copy())
+
+            if done or truncated:
+                observation = env.reset()
+                logger.log_scalar(info["episode"]["r"], "train_return", step)
+                logger.log_scalar(info["episode"]["l"], "train_ep_len", step)
+            else:
+                observation = next_observation
+        
         # Main training loop
         batch = replay_buffer.sample(config["batch_size"])
 
@@ -70,7 +141,7 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
         update_info = agent.update(
             batch["observations"],
             batch["actions"],
-            batch["rewards"] * (1 if config.get("use_reward", False) else 0),
+            batch["rewards"],  # * (1 if config.get("use_reward", False) else 0),
             batch["next_observations"],
             batch["dones"],
             step,
@@ -87,6 +158,7 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
 
         if step % args.eval_interval == 0:
             # Evaluate
+            print(f"Step {step}: Starting evaluation...")
             trajectories = utils.sample_n_trajectories(
                 env,
                 agent,
@@ -95,7 +167,8 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
             )
             returns = [t["episode_statistics"]["r"] for t in trajectories]
             ep_lens = [t["episode_statistics"]["l"] for t in trajectories]
-
+            print(f"Evaluation returns: {returns}")
+            print(f"Mean return: {np.mean(returns)}")
             logger.log_scalar(np.mean(returns), "eval_return", step)
             logger.log_scalar(np.mean(ep_lens), "eval_ep_len", step)
 
@@ -107,7 +180,9 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
                 logger.log_scalar(np.max(ep_lens), "eval/ep_len_max", step)
                 logger.log_scalar(np.min(ep_lens), "eval/ep_len_min", step)
 
-        if step % args.visualize_interval == 0:
+        # in offline training, we needn't record visualizations
+        # if step % args.visualize_interval == 0:
+        if step>=num_offline_steps and step % args.visualize_interval == 0:
             env_pointmass: Pointmass = env.unwrapped
             observations = np.stack(recent_observations)
             recent_observations = []
@@ -119,10 +194,10 @@ def run_training_loop(config: dict, logger: Logger, args: argparse.Namespace):
             )
 
     # Save the final dataset
-    dataset_file = os.path.join(args.dataset_dir, f"{config['dataset_name']}.pkl")
-    with open(dataset_file, "wb") as f:
-        pickle.dump(replay_buffer, f)
-        print("Saved dataset to", dataset_file)
+    # dataset_file = os.path.join(args.dataset_dir, f"{config['dataset_name']}.pkl")
+    # with open(dataset_file, "wb") as f:
+    #     pickle.dump(replay_buffer, f)
+    #     print("Saved dataset to", dataset_file)
 
     # Render final heatmap
     fig = visualize(
@@ -169,6 +244,7 @@ def main():
     logger = make_logger(logdir_prefix, config)
 
     os.makedirs(args.dataset_dir, exist_ok=True)
+    os.makedirs("exploration", exist_ok=True)
     print(
         banner.format(
             env=config["env_name"], alg=config["agent"], dataset_dir=args.dataset_dir

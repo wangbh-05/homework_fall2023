@@ -28,8 +28,8 @@ def extract_tensorboard_scalars(log_file, scalar_keys):
     return scalars
 
 def compute_mean_std(scalars: List[Dict[str, Any]],
-                     data_key: str,
-                     ninterp=100):
+                    data_key: str,
+                    ninterp=100):
     min_step = min([s for slog in scalars for s in slog[data_key]['step']])
     max_step = max([s for slog in scalars for s in slog[data_key]['step']])
     steps = np.linspace(min_step, max_step, ninterp)
@@ -45,19 +45,19 @@ def compute_mean_std(scalars: List[Dict[str, Any]],
 
 
 def plot_mean_std(ax: plt.Axes,
-                  steps: np.ndarray,
-                  mean: np.ndarray,
-                  std: np.ndarray,
-                  name: str,
-                  color: str):
+                steps: np.ndarray,
+                mean: np.ndarray,
+                std: np.ndarray,
+                name: str,
+                color: str):
     ax.fill_between(steps, mean-std, mean+std, color=color, alpha=0.3)
     ax.plot(steps, mean, color=color, label=name)
 
 def plot_scalars(ax: plt.Axes,
-                 scalars: Dict[str, Any],
-                 data_key: str,
-                 name: str,
-                 color: str):
+                scalars: Dict[str, Any],
+                data_key: str,
+                name: str,
+                color: str):
     ax.plot(scalars[data_key]['step'], scalars[data_key]['value'], color=color, label=name)
 
 if __name__ == '__main__':

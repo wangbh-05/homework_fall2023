@@ -46,7 +46,11 @@ class RNDAgent(DQNAgent):
         Update the RND network using the observations.
         """
         # TODO(student): update the RND network
-        loss = ...
+        # DONE
+        pred_target=self.rnd_target_net(obs)
+        pred_value=self.rnd_net(obs)
+        # L2 as loss function
+        loss = torch.mean(torch.norm(pred_value - pred_target, dim=-1))
 
         self.rnd_optimizer.zero_grad()
         loss.backward()
@@ -65,9 +69,12 @@ class RNDAgent(DQNAgent):
     ):
         with torch.no_grad():
             # TODO(student): Compute RND bonus for batch and modify rewards
-            rnd_error = ...
+            # DONE
+            pred_target_next=self.rnd_target_net(next_observations)
+            pred_values_next=self.rnd_net(next_observations)
+            rnd_error = torch.norm(pred_target_next - pred_values_next, dim=-1)
             assert rnd_error.shape == rewards.shape
-            rewards = ...
+            rewards = rewards + self.rnd_weight * rnd_error
 
         metrics = super().update(observations, actions, rewards, next_observations, dones, step)
 

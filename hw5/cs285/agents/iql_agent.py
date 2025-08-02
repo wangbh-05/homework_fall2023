@@ -38,7 +38,14 @@ class IQLAgent(AWACAgent):
         action_dist: Optional[torch.distributions.Categorical] = None,
     ):
         # TODO(student): Compute advantage with IQL
-        return ...
+        # DONE
+        qa_values = self.critic(observations)
+        q_values = torch.gather(qa_values, -1, torch.unsqueeze(actions.long(), 1)).squeeze(-1)
+        values = self.value_critic(observations).squeeze(-1)
+        assert q_values.shape == values.shape
+        
+        advantages = q_values - values
+        return advantages
 
     def update_q(
         self,
@@ -52,7 +59,13 @@ class IQLAgent(AWACAgent):
         Update Q(s, a)
         """
         # TODO(student): Update Q(s, a) to match targets (based on V)
-        loss = ...
+        # DONE
+        qa_values = self.critic(observations)
+        q_values = torch.gather(qa_values, -1, torch.unsqueeze(actions.long(), 1)).squeeze()
+        target_values = rewards + self.discount * (
+            self.value_critic(next_observations).squeeze(-1) * (1 - dones.float())
+        )
+        loss = self.critic_loss(q_values, target_values)
 
         self.critic_optimizer.zero_grad()
         loss.backward()
@@ -78,7 +91,12 @@ class IQLAgent(AWACAgent):
         Compute the expectile loss for IQL
         """
         # TODO(student): Compute the expectile loss
-        return ...
+        # DONE
+        assert target_qs.shape == vs.shape
+        mu=target_qs-vs
+        indicator = (mu <= 0).float()
+        loss = torch.abs(expectile-indicator)*torch.pow(mu, 2)
+        return loss.mean()
 
     def update_v(
         self,
@@ -89,9 +107,16 @@ class IQLAgent(AWACAgent):
         Update the value network V(s) using targets Q(s, a)
         """
         # TODO(student): Compute target values for V(s)
+        # DONE
+        qa_values = self.critic(observations)
+        q_values = torch.gather(qa_values, -1, torch.unsqueeze(actions.long(), 1)).squeeze()
+        target_values = q_values.detach()  # Use the Q(s, a) as target for V(s)
+
+        vs = self.value_critic(observations).squeeze(-1)
 
         # TODO(student): Update V(s) using the loss from the IQL paper
-        loss = ...
+        # DONE
+        loss = self.iql_expectile_loss(self.expectile, vs, target_values)
 
         self.value_critic_optimizer.zero_grad()
         loss.backward()
