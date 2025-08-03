@@ -1,0 +1,23 @@
+# 1.DQN
+
+### 1.1 Basic Q-Learning
+
+![1754117490302](image/README/1754117490302.png)
+
+### 1.2 Double Q-Learning
+
+![1754119234502](image/README/1754119234502.png)
+
+![1754119946998](image/README/1754119946998.png)
+
+# 2.Actor-Critic
+
+### 2.1 REINFORCE vs. REPARAMETRIZE
+
+![1754120576904](image/README/1754120576904.png)
+
+![1754120054425](image/README/1754120054425.png)
+
+### 2.2 Stabilizing Target Values
+
+![1754120118395](image/README/1754120118395.png)

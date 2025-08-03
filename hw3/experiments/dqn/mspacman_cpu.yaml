@@ -1,0 +1,21 @@
+base_config: dqn_atari
+env_name: MsPacmanNoFrameskip-v0
+
+learning_rate: 1.0e-4
+discount: 0.99
+target_update_period: 1500      # 减少更新间隔，提高效率
+use_double_q: true
+
+# 减少内存使用，提升速度
+replay_buffer_capacity: 300000  # 从500k降到300k，约2GB
+
+# 适应15 steps/sec的速度
+total_steps: 450000             # 9小时内可完成
+learning_starts: 30000          # 6.7%用于初始收集
+batch_size: 32                  # 降低批量大小，减少计算负担
+training_freq: 8                # 降低训练频率，提升采样速度
+
+# 减少评估开销
+eval_interval: 75000            # 减少评估频率
+num_eval_trajectories: 5       # 减少评估轨迹数
+log_interval: 10000             # 减少日志频率
