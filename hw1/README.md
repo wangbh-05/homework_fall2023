@@ -1,73 +1,64 @@
-## Setup
+# 1.Behavioral Cloning
 
-You can run this code on your own machine or on Google Colab. 
+## 1.eval_averageretrun & eval_stdreturn
 
-1. **Local option:** If you choose to run locally, you will need to install MuJoCo and some Python packages; see [installation.md](installation.md) for instructions.
-2. **Colab:** The first few sections of the notebook will install all required dependencies. You can try out the Colab option by clicking the badge below:
+| env            | eval/train_average | eval/train_std |
+| -------------- | ------------------ | -------------- |
+| Ant-v4         | 4113/4681          | 1107/30        |
+| Hopper-v4      | 1120/3717          | 337/0.35       |
+| Walker2d-v4    | 1283/5383          | 1387/54        |
+| HalfCheetah-v4 | 3866/4034          | 41/32          |
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/berkeleydeeprlcourse/homework_fall2023/blob/master/hw1/cs285/scripts/run_hw1.ipynb)
+### 0.I found that loss function choose matter!
 
-## Complete the code
+and no matter forward return an action or a distribution
 
-Fill in sections marked with `TODO`. In particular, edit
- - [policies/MLP_policy.py](cs285/policies/MLP_policy.py)
- - [infrastructure/utils.py](cs285/infrastructure/utils.py)
- - [scripts/run_hw1.py](cs285/scripts/run_hw1.py)
+the following experiments all use 'eval_batch_size=5000'
 
-You have the option of running locally or on Colab using
- - [scripts/run_hw1.py](cs285/scripts/run_hw1.py) (if running locally) or [scripts/run_hw1.ipynb](cs285/scripts/run_hw1.ipynb) (if running on Colab)
+#### 1.MLP_policy.forward return an action , use MSE
 
-See the homework pdf for more details.
+Eval_AverageReturn : -477.34759521484375
+Eval_StdReturn : 132.45663452148438
 
-## Run the code
+Train_AverageReturn : 4034.7999834965067
+Train_StdReturn : 32.8677631311341
 
-Tip: While debugging, you probably want to keep the flag `--video_log_freq -1` which will disable video logging and speed up the experiment. However, feel free to remove it to save videos of your awesome policy!
+Training Loss : 0.004244372248649597
 
-If running on Colab, adjust the `#@params` in the `Args` class according to the commmand line arguments above.
+#### 2.MLP_policy.forward return a distribution , use MLE
 
-### Section 1 (Behavior Cloning)
-Command for problem 1:
+Eval_AverageReturn : 4113.93359375
+Eval_StdReturn : 1107.3634033203125
 
-```
-python cs285/scripts/run_hw1.py \
-	--expert_policy_file cs285/policies/experts/Ant.pkl \
-	--env_name Ant-v4 --exp_name bc_ant --n_iter 1 \
-	--expert_data cs285/expert_data/expert_data_Ant-v4.pkl \
-	--video_log_freq -1
-```
+Train_AverageReturn : 4681.891673935816
+Train_StdReturn : 30.70862278765526
 
-Make sure to also try another environment.
-See the homework PDF for more details on what else you need to run.
-To generate videos of the policy, remove the `--video_log_freq -1` flag.
+Training Loss : -1592.7430419921875
 
-### Section 2 (DAgger)
-Command for section 1:
-(Note the `--do_dagger` flag, and the higher value for `n_iter`)
+#### 3.MLP_policy.forward return a distribution , use MSE
 
-```
-python cs285/scripts/run_hw1.py \
-    --expert_policy_file cs285/policies/experts/Ant.pkl \
-    --env_name Ant-v4 --exp_name dagger_ant --n_iter 10 \
-    --do_dagger --expert_data cs285/expert_data/expert_data_Ant-v4.pkl \
-	--video_log_freq -1
-```
+Eval_AverageReturn : -477.34759521484375
+Eval_StdReturn : 132.45663452148438
 
-Make sure to also try another environment.
-See the homework PDF for more details on what else you need to run.
+Train_AverageReturn : 4034.7999834965067
+Train_StdReturn : 32.8677631311341
 
-## Visualization the saved tensorboard event file:
+Training Loss : 0.004244372248649597
 
-You can visualize your runs using tensorboard:
-```
-tensorboard --logdir data
-```
+#### 4.MLP_policy.forward return an action , use MLE
 
-You will see scalar summaries as well as videos of your trained policies (in the 'images' tab).
+MLE(Maximum Likelihood Loss) need a distribution to calculate the probability
 
-You can choose to visualize specific runs with a comma-separated list:
-```
-tensorboard --logdir data/run1,data/run2,data/run3...
-```
+## 2.hyperparameters experiments![1754152233370](image/README/1754152233370.png)![1754152242725](image/README/1754152242725.png)
 
-If running on Colab, you will be using the `%tensorboard` [line magic](https://ipython.readthedocs.io/en/stable/interactive/magics.html) to do the same thing; see the [notebook](cs285/scripts/run_hw1.ipynb) for more details.
+![1754152217202](image/README/1754152217202.png)
 
+why lr=1e3 behave poorly? i run different seeds and find the num_agent_train_steps_per_iter matters . when use lr=1e3 steps=5000 different seeds always have good results.
+
+so maybe the training step is fixed here and small lr can't find the best performance
+
+# 2.DAGGER
+
+![1754152257170](image/README/1754152257170.png)
+
+![1754152249143](image/README/1754152249143.png)

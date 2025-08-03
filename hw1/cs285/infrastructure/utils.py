@@ -18,7 +18,7 @@ def sample_trajectory(env, policy, max_path_length, render=False):
     
     # initialize env for the beginning of a new rollout
     ob =  env.reset() # TODO: initial observation after resetting the env
-
+    
     # init vars
     obs, acs, rewards, next_obs, terminals, image_obs = [], [], [], [], [], []
     steps = 0
@@ -33,15 +33,19 @@ def sample_trajectory(env, policy, max_path_length, render=False):
             image_obs.append(cv2.resize(img, dsize=(250, 250), interpolation=cv2.INTER_CUBIC))
     
         # TODO use the most recent ob to decide what to do
-        ac = TODO # HINT: this is a numpy array
-        ac = ac[0]
+        ob_tensor = ptu.from_numpy(ob)
+        ac_tensor = policy(ob_tensor).sample()  # HINT: this is a numpy array????wrong!
+        ac = ptu.to_numpy(ac_tensor)
 
         # TODO: take that action and get reward and next ob
-        next_ob, rew, done, _ = TODO
-        
+        next_ob, rew, done, _ = env.step(ac)  # HINT: this is a tuple of (next_ob, rew, done, info)
         # TODO rollout can end due to done, or due to max_path_length
         steps += 1
-        rollout_done = TODO # HINT: this is either 0 or 1
+        if steps == max_path_length or done:
+            rollout_done = 1  # HINT: this is either 0 or 1
+        else:
+            rollout_done = 0
+        # print(type(next_ob), type(ac), type(ob))
         
         # record result of taking that action
         obs.append(ob)

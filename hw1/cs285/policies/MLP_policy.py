@@ -74,15 +74,15 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         Trains the policy with a supervised learning objective
     """
     def __init__(self,
-                 ac_dim,
-                 ob_dim,
-                 n_layers,
-                 size,
-                 learning_rate=1e-4,
-                 training=True,
-                 nn_baseline=False,
-                 **kwargs
-                 ):
+                ac_dim,
+                ob_dim,
+                n_layers,
+                size,
+                learning_rate=1e-4,
+                training=True,
+                nn_baseline=False,
+                **kwargs
+                ):
         super().__init__(**kwargs)
 
         # init vars
@@ -101,12 +101,15 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         )
         self.mean_net.to(ptu.device)
         self.logstd = nn.Parameter(
-
+            # Initialize log standard deviation to zero
             torch.zeros(self.ac_dim, dtype=torch.float32, device=ptu.device)
         )
         self.logstd.to(ptu.device)
         self.optimizer = optim.Adam(
+            # Combine the parameters of the mean network and logstd
             itertools.chain([self.logstd], self.mean_net.parameters()),
+            # use itertools.chain to combine parameters
+            # it needs iterable objects:[self.logstd](this [] is very important! without it self.logstd isn't iterable!)and self.mean_net.parameters()
             self.learning_rate
         )
 
@@ -129,8 +132,13 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
         # through it. For example, you can return a torch.FloatTensor. You can also
         # return more flexible objects, such as a
         # `torch.distributions.Distribution` object. It's up to you!
-        raise NotImplementedError
-
+        mean= self.mean_net(observation)
+        logstd = self.logstd.expand_as(mean)
+        action_distribution = distributions.Normal(
+            loc=mean, scale=torch.exp(logstd)
+        )   # # Create a normal distribution with the mean and stddev
+        
+        return action_distribution
     def update(self, observations, actions):
         """
         Updates/trains the policy
@@ -141,7 +149,17 @@ class MLPPolicySL(BasePolicy, nn.Module, metaclass=abc.ABCMeta):
             dict: 'Training Loss': supervised learning loss
         """
         # TODO: update the policy and return the loss
-        loss = TODO
+        # Convert observations and actions to torch tensors
+        observations = ptu.from_numpy(observations)
+        actions = ptu.from_numpy(actions)
+        # standard supervised learning loss
+        self.optimizer.zero_grad()
+        dist=self(observations)
+        logp=dist.log_prob(actions)
+        loss= - logp.sum()
+        
+        loss.backward()
+        self.optimizer.step()
         return {
             # You can add extra logging information here, but keep this line
             'Training Loss': ptu.to_numpy(loss),
