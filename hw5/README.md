@@ -1,62 +1,95 @@
-# 1.Behavioral Cloning
+# 1.Exploration
 
-## 1.eval_averageretrun & eval_stdreturn
+### 1.1 Random Policy
 
-| env            | eval/train_average | eval/train_std |
-| -------------- | ------------------ | -------------- |
-| Ant-v4         | 4113/4681          | 1107/30        |
-| Hopper-v4      | 1120/3717          | 337/0.35       |
-| Walker2d-v4    | 1283/5383          | 1387/54        |
-| HalfCheetah-v4 | 3866/4034          | 41/32          |
+![1753963774420](image/submit/1753963774420.png)
 
-### 0.I found that loss function choose matter!
+![1753963812470](image/submit/1753963812470.png)
 
-and no matter forward return an action or a distribution
+![1753963792063](image/submit/1753963792063.png)
 
-the following experiments all use 'eval_batch_size=5000'
+### 1.2 RND
 
-#### 1.MLP_policy.forward return an action , use MSE
+![1753963861619](image/submit/1753963861619.png)
 
-Eval_AverageReturn : -477.34759521484375
-Eval_StdReturn : 132.45663452148438
+![1753963870087](image/submit/1753963870087.png)
 
-Train_AverageReturn : 4034.7999834965067
-Train_StdReturn : 32.8677631311341
+![1753963875580](image/submit/1753963875580.png)
 
-Training Loss : 0.004244372248649597
+# 2.Offline RL
 
-#### 2.MLP_policy.forward return a distribution , use MLE
+### 2.1 CQL
 
-Eval_AverageReturn : 4113.93359375
-Eval_StdReturn : 1107.3634033203125
+#### 2.1.1 与DQN在easy和medium环境中对比：
 
-Train_AverageReturn : 4681.891673935816
-Train_StdReturn : 30.70862278765526
+![1753971809752](image/submit/1753971809752.png)
 
-Training Loss : -1592.7430419921875
+![1753971910199](image/submit/1753971910199.png)
 
-#### 3.MLP_policy.forward return a distribution , use MSE
+#### 2.1.2 CQL不同alpha参数性能对比
 
-Eval_AverageReturn : -477.34759521484375
-Eval_StdReturn : 132.45663452148438
+![1754018264858](image/submit/1754018264858.png)
 
-Train_AverageReturn : 4034.7999834965067
-Train_StdReturn : 32.8677631311341
+alpha=0
 
-Training Loss : 0.004244372248649597
+![1754032081507](image/submit/1754032081507.png)
 
-#### 4.MLP_policy.forward return an action , use MLE
+alpha=0.1
 
-MLE(Maximum Likelihood Loss) need a distribution to calculate the probability
+![1754032095283](image/submit/1754032095283.png)
 
-## 2.hyperparameters experiments
+#### 2.1.3 IQL & AWAC
 
-![1754189372419](image/README/1754189372419.png)![1754189390277](image/README/1754189390277.png)![1754189396216](image/README/1754189396216.png)
+环境难，数据集质量低，收集数据少，训练步数少，效果差
 
-why lr=1e3 behave poorly? i run different seeds and find the num_agent_train_steps_per_iter matters . when use lr=1e3 steps=5000 different seeds always have good results.
+###### IQL
 
-so maybe the training step is fixed here and small lr can't find the best performance
+step=10000
 
-# 2.DAGGER
+![1754032528432](image/submit/1754032528432.png)
 
-![1754189408359](image/README/1754189408359.png)![1754189413277](image/README/1754189413277.png)
+###### AWAC
+
+step=30000
+
+![1754032577898](image/submit/1754032577898.png)
+
+#### 2.1.4 Data ablations
+
+Run RND with total_steps 1000, 5000, 10000, and 20000 on Hard environment
+
+use CQL agent compare difference sizes of dataset
+
+rnd 20k:
+
+![1754034261974](image/submit/1754034261974.png)
+
+![1754037682915](image/submit/1754037682915.png)
+
+
+
+rnd 50k:
+
+![1754034753420](image/submit/1754034753420.png)
+
+![1754037696358](image/submit/1754037696358.png)
+
+compare 10k 20k 50k:
+
+blue: 20k 	 red: 50k	green: 10k
+
+![1754039720752](image/submit/1754039720752.png)
+
+### 3.Online Fine-Tuning
+
+#### 3.1 CQL dataset: rnd 20k
+
+![1754111060447](image/submit/1754111060447.png)
+
+![1754109713479](image/submit/1754109713479.png)
+
+#### 3.2 AWAC dataset:50k
+
+![1754111023115](image/submit/1754111023115.png)
+
+![1754109718155](image/submit/1754109718155.png)
