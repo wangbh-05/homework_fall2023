@@ -59,23 +59,26 @@ class MLPPolicy(nn.Module):
     def get_action(self, obs: np.ndarray) -> np.ndarray:
         """Takes a single observation (as a numpy array) and returns a single action (as a numpy array)."""
         # TODO: implement get_action
-        action = None
-
-        return action
+        action_distribution = self(ptu.from_numpy(obs))
+        action = action_distribution.sample()
+        return ptu.to_numpy(action)
 
     def forward(self, obs: torch.FloatTensor):
         """
         This function defines the forward pass of the network.  You can return anything you want, but you should be
         able to differentiate through it. For example, you can return a torch.FloatTensor. You can also return more
         flexible objects, such as a `torch.distributions.Distribution` object. It's up to you!
+        I choose to return a distribution
         """
         if self.discrete:
             # TODO: define the forward pass for a policy with a discrete action space.
-            pass
+            logits=self.logits_net(obs)
+            return distributions.Categorical(logits=logits)
         else:
             # TODO: define the forward pass for a policy with a continuous action space.
-            pass
-        return None
+            mean = self.mean_net(obs)
+            logstd = self.logstd.expand(mean.shape)
+            return distributions.Normal(mean, logstd.exp())
 
     def update(self, obs: np.ndarray, actions: np.ndarray, *args, **kwargs) -> dict:
         """Performs one iteration of gradient descent on the provided batch of data."""
@@ -97,8 +100,22 @@ class MLPPolicyPG(MLPPolicy):
         advantages = ptu.from_numpy(advantages)
 
         # TODO: implement the policy gradient actor update.
-        loss = None
-
+        action_distribution = self(obs)
+        log_probs = action_distribution.log_prob(actions)
+        
+        # 对多维连续动作求和（这个你应该已经有了）
+        if len(log_probs.shape) > 1:
+            log_probs = log_probs.sum(dim=-1)
+        
+        # 关键修复：检查并限制 log_probs 的范围
+        log_probs = torch.clamp(log_probs, min=-10, max=10)
+        
+        loss = -(log_probs * advantages).mean()
+        
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        
         return {
             "Actor Loss": ptu.to_numpy(loss),
         }
