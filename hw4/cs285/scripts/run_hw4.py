@@ -41,15 +41,35 @@ def collect_mbpo_rollout(
     obs, acs, rewards, next_obs, dones = [], [], [], [], []
     for _ in range(rollout_len):
         # TODO(student): collect a rollout using the learned dynamics models
+        # DONE
         # HINT: get actions from `sac_agent` and `next_ob` predictions from `mb_agent`.
         # Average the ensemble predictions directly to get the next observation.
         # Get the reward using `env.get_reward`.
-
+        ac = sac_agent.get_action(ob)
+        # ac shape: (ac_dim,)
+        
+        next_ob_pred=[]
+        # append batch dimension to ob and ac
+        # print(ob.shape)
+        ob = np.expand_dims(ob, axis=0)
+        ac = np.expand_dims(ac, axis=0)
+        for i in range(mb_agent.ensemble_size):
+            next_ob_pred.append(mb_agent.get_dynamics_predictions(i,ob,ac))
+            # next_ob_pred shape: (batch, ob_dim)
+        # remove the batch dimension of ob,ac
+        ob = np.squeeze(ob, axis=0)
+        ac = np.squeeze(ac, axis=0)
+        # remove the batch dimension of next_ob_pred(a list now!)
+        next_ob_pred = np.stack(next_ob_pred, axis=0)
+        next_ob = np.mean(next_ob_pred,axis=0)
+        next_ob = np.squeeze(next_ob, axis=0)
+        rew, done = env.get_reward(next_ob, ac)
+        # rew,done shape: (1,)
         obs.append(ob)
         acs.append(ac)
         rewards.append(rew)
         next_obs.append(next_ob)
-        dones.append(False)
+        dones.append(done)
 
         ob = next_ob
 
@@ -118,11 +138,17 @@ def run_training_loop(
         print("Collecting data...")
         if itr == 0:
             # TODO(student): collect at least config["initial_batch_size"] transitions with a random policy
+            #DONE
             # HINT: Use `utils.RandomPolicy` and `utils.sample_trajectories`
-            trajs, envsteps_this_batch = ...
+            trajs, envsteps_this_batch = utils.sample_trajectories(
+                env, utils.RandomPolicy(env), config["initial_batch_size"], ep_len
+            )
         else:
             # TODO(student): collect at least config["batch_size"] transitions with our `actor_agent`
-            trajs, envsteps_this_batch = ...
+            # DONE
+            trajs, envsteps_this_batch = utils.sample_trajectories(
+                env, actor_agent, config["batch_size"], ep_len
+            )
 
         total_envsteps += envsteps_this_batch
         logger.log_scalar(total_envsteps, "total_envsteps", itr)
@@ -163,8 +189,13 @@ def run_training_loop(
         ):
             step_losses = []
             # TODO(student): train the dynamics models
+            # DONE
             # HINT: train each dynamics model in the ensemble with a *different* batch of transitions!
             # Use `replay_buffer.sample` with config["train_batch_size"].
+            for i in range(mb_agent.ensemble_size):
+                batch=replay_buffer.sample(config["train_batch_size"])
+                obs, acs, next_obs = batch["observations"], batch["actions"], batch["next_observations"]
+                step_losses.append(mb_agent.update(i, obs, acs, next_obs))
             all_losses.append(np.mean(step_losses))
 
         # on iteration 0, plot the full learning curve
@@ -205,12 +236,19 @@ def run_training_loop(
                     )
                 # train SAC
                 batch = sac_replay_buffer.sample(sac_config["batch_size"])
+                # FIX: Convert numpy arrays to torch tensors before updating the agent
+                obs_batch = ptu.from_numpy(batch["observations"])
+                acs_batch = ptu.from_numpy(batch["actions"])
+                rews_batch = ptu.from_numpy(batch["rewards"])
+                next_obs_batch = ptu.from_numpy(batch["next_observations"])
+                dones_batch = ptu.from_numpy(batch["dones"])
+
                 sac_agent.update(
-                    batch["observations"],
-                    batch["actions"],
-                    batch["rewards"],
-                    batch["next_observations"],
-                    batch["dones"],
+                    obs_batch,
+                    acs_batch,
+                    rews_batch,
+                    next_obs_batch,
+                    dones_batch,
                     i,
                 )
 

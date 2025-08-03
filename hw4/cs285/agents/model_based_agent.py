@@ -83,14 +83,19 @@ class ModelBasedAgent(nn.Module):
         acs = ptu.from_numpy(acs)
         next_obs = ptu.from_numpy(next_obs)
         # TODO(student): update self.dynamics_models[i] using the given batch of data
+        # DONE
         # HINT: make sure to normalize the NN input (observations and actions)
         # *and* train it with normalized outputs (observation deltas) 
         # HINT 2: make sure to train it with observation *deltas*, not next_obs
         # directly
         # HINT 3: make sure to avoid any risk of dividing by zero when
         # normalizing vectors by adding a small number to the denominator!
-        loss = ...
-
+        obs_acs = torch.cat([obs, acs], dim=1)
+        normalized_input = (obs_acs - self.obs_acs_mean) / self.obs_acs_std
+        deltas = next_obs - obs
+        normalized_deltas = (deltas - self.obs_delta_mean) / self.obs_delta_std
+        target_deltas = self.dynamics_models[i](normalized_input)
+        loss = self.loss_fn(target_deltas, normalized_deltas)
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
@@ -111,10 +116,13 @@ class ModelBasedAgent(nn.Module):
         acs = ptu.from_numpy(acs)
         next_obs = ptu.from_numpy(next_obs)
         # TODO(student): update the statistics
-        self.obs_acs_mean = ...
-        self.obs_acs_std = ...
-        self.obs_delta_mean = ...
-        self.obs_delta_std = ...
+        # DONE
+        obs_acs = torch.cat([obs, acs], dim=1)
+        self.obs_acs_mean = obs_acs.mean(dim=0)
+        self.obs_acs_std = obs_acs.std(dim=0)+1e-6
+        obs_delta = next_obs - obs
+        self.obs_delta_mean = obs_delta.mean(dim=0)
+        self.obs_delta_std = obs_delta.std(dim=0)+1e-6
 
     @torch.no_grad()
     def get_dynamics_predictions(
@@ -135,6 +143,11 @@ class ModelBasedAgent(nn.Module):
         # HINT: make sure to *unnormalize* the NN outputs (observation deltas)
         # Same hints as `update` above, avoid nasty divide-by-zero errors when
         # normalizing inputs!
+        obs_acs = torch.cat([obs, acs], dim=1)
+        normalized_input = (obs_acs - self.obs_acs_mean) / self.obs_acs_std
+        normalized_deltas = self.dynamics_models[i](normalized_input)
+        unnormalized_deltas = normalized_deltas * self.obs_delta_std + self.obs_delta_mean
+        pred_next_obs = unnormalized_deltas + obs
         return ptu.to_numpy(pred_next_obs)
 
     def evaluate_action_sequences(self, obs: np.ndarray, action_sequences: np.ndarray):
@@ -160,7 +173,10 @@ class ModelBasedAgent(nn.Module):
         obs = np.tile(obs, (self.ensemble_size, self.mpc_num_action_sequences, 1))
 
         # TODO(student): for each batch of actions in in the horizon...
-        for acs in ...:
+        #DONE
+        horizon = action_sequences.shape[1]
+        for t in range(horizon):
+            acs = action_sequences[:, t]
             assert acs.shape == (self.mpc_num_action_sequences, self.ac_dim)
             assert obs.shape == (
                 self.ensemble_size,
@@ -169,8 +185,13 @@ class ModelBasedAgent(nn.Module):
             )
 
             # TODO(student): predict the next_obs for each rollout
+            # DONE
             # HINT: use self.get_dynamics_predictions
-            next_obs = ...
+            next_obs = np.zeros(
+                (self.ensemble_size, self.mpc_num_action_sequences, self.ob_dim)
+            )
+            for i in range(self.ensemble_size):
+                next_obs[i] = self.get_dynamics_predictions(i, obs[i], acs)
             assert next_obs.shape == (
                 self.ensemble_size,
                 self.mpc_num_action_sequences,
@@ -178,12 +199,17 @@ class ModelBasedAgent(nn.Module):
             )
 
             # TODO(student): get the reward for the current step in each rollout
+            # DONE
             # HINT: use `self.env.get_reward`. `get_reward` takes 2 arguments:
             # `next_obs` and `acs` with shape (n, ob_dim) and (n, ac_dim),
             # respectively, and returns a tuple of `(rewards, dones)`. You can 
             # ignore `dones`. You might want to do some reshaping to make
             # `next_obs` and `acs` 2-dimensional.
-            rewards = ...
+            batch_obs=next_obs.reshape(-1,self.ob_dim)
+            batch_acs=np.tile(acs,(self.ensemble_size,1))
+            rewards,dones = self.env.get_reward(batch_obs, batch_acs)
+            rewards=rewards.squeeze()
+            rewards = rewards.reshape(self.ensemble_size, self.mpc_num_action_sequences)
             assert rewards.shape == (self.ensemble_size, self.mpc_num_action_sequences)
 
             sum_of_rewards += rewards
@@ -217,7 +243,29 @@ class ModelBasedAgent(nn.Module):
             elite_mean, elite_std = None, None
             for i in range(self.cem_num_iters):
                 # TODO(student): implement the CEM algorithm
+                # DONE
                 # HINT: you need a special case for i == 0 to initialize
                 # the elite mean and std
+                if i==0:
+                    # use the initial random action_sequences above
+                    pass
+                else:
+                    action_sequences = np.random.normal(
+                        loc=elite_mean,
+                        scale=elite_std,
+                        size=action_sequences.shape,
+                    )
+                    action_sequences = np.clip(
+                    action_sequences,
+                    self.env.action_space.low,
+                    self.env.action_space.high
+                    )
+                rewards = self.evaluate_action_sequences(obs, action_sequences)
+                elite_indices = np.argsort(rewards)[-self.cem_num_elites:]
+                elite_sequences = action_sequences[elite_indices]
+                elite_mean = elite_sequences.mean(axis=0)
+                elite_std = elite_sequences.std(axis=0)
+            # return the best action(just one action not the whole sequence)
+            return elite_mean[0]
         else:
             raise ValueError(f"Invalid MPC strategy '{self.mpc_strategy}'")
