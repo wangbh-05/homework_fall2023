@@ -50,9 +50,8 @@ Training Loss : 0.004244372248649597
 MLE(Maximum Likelihood Loss) need a distribution to calculate the probability
 
 ## 2.hyperparameters experiments
-![1754152233370](image/submit/1754152233370.png)![1754152242725](image/submit/1754152242725.png)
 
-![1754152217202](image/submit/1754152217202.png)
+![1754189372419](image/README/1754189372419.png)![1754189390277](image/README/1754189390277.png)![1754189396216](image/README/1754189396216.png)
 
 why lr=1e3 behave poorly? i run different seeds and find the num_agent_train_steps_per_iter matters . when use lr=1e3 steps=5000 different seeds always have good results.
 
@@ -60,6 +59,4 @@ so maybe the training step is fixed here and small lr can't find the best perfor
 
 # 2.DAGGER
 
-![1754152257170](image/submit/1754152257170.png)
-
-![1754152249143](image/submit/1754152249143.png)
+![1754189408359](image/README/1754189408359.png)![1754189413277](image/README/1754189413277.png)
